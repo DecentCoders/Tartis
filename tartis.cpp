@@ -11,7 +11,6 @@ int field[height][width] = {0};
 int score = 0;
 bool gameOver = false;
 
-// Tetromino shapes (4x4 grid, encoded as 16-character strings)
 string tetromino[7] = {
     "...."
     "XXXX"
@@ -49,10 +48,11 @@ string tetromino[7] = {
     "...." // Z
 };
 
+WORD colors[7] = {11, 6, 9, 14, 13, 10, 12};
+
 int currentPiece, rotation = 0;
 int x = width / 2 - 2, y = 0;
 
-// Rotate index in 4x4
 int rotate(int px, int py, int r)
 {
     switch (r % 4)
@@ -91,19 +91,26 @@ bool doesFit(int n, int r, int posX, int posY)
 void draw()
 {
     system("cls");
+    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
     for (int i = 0; i < height; i++)
     {
         for (int j = 0; j < width; j++)
         {
             if (field[i][j] == 0)
+            {
+                SetConsoleTextAttribute(console, 7);
                 cout << ".";
+            }
             else
+            {
+                SetConsoleTextAttribute(console, colors[field[i][j] - 1]);
                 cout << "#";
+            }
         }
         cout << endl;
     }
 
-    // Draw current block
+    SetConsoleTextAttribute(console, colors[currentPiece]);
     for (int py = 0; py < 4; py++)
         for (int px = 0; px < 4; px++)
         {
@@ -114,15 +121,15 @@ void draw()
                 if (fy >= 0 && fy < height && fx >= 0 && fx < width)
                 {
                     COORD pos = {(SHORT)fx, (SHORT)fy};
-                    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+                    SetConsoleCursorPosition(console, pos);
                     cout << "O";
                 }
             }
         }
+    SetConsoleTextAttribute(console, 15);
 
-    // Show score
     COORD scorePos = {0, height + 1};
-    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), scorePos);
+    SetConsoleCursorPosition(console, scorePos);
     cout << "Score: " << score;
 }
 
@@ -136,11 +143,10 @@ void lockPiece()
                 int fx = x + px;
                 int fy = y + py;
                 if (fy >= 0 && fy < height && fx >= 0 && fx < width)
-                    field[fy][fx] = 1;
+                    field[fy][fx] = currentPiece + 1;
             }
         }
 
-    // Line clear
     for (int i = height - 1; i >= 0; i--)
     {
         bool full = true;
@@ -162,7 +168,7 @@ void lockPiece()
                 field[0][j] = 0;
 
             score += 100;
-            i++; // check same row again
+            i++;
         }
     }
 }
@@ -181,23 +187,46 @@ void input()
 {
     if (_kbhit())
     {
-        char key = _getch();
-        if (key == 'a' && doesFit(currentPiece, rotation, x - 1, y))
-            x--;
-        if (key == 'd' && doesFit(currentPiece, rotation, x + 1, y))
-            x++;
-        if (key == 's' && doesFit(currentPiece, rotation, x, y + 1))
-            y++;
-        if (key == 'w' && doesFit(currentPiece, rotation + 1, x, y))
-            rotation++;
+        int key = _getch();
+        if (key == 0 || key == 224)
+        { // Arrow key prefix
+            key = _getch();
+            if (key == 75)
+            { // Left arrow
+                if (doesFit(currentPiece, rotation, x - 1, y))
+                    x--;
+            }
+            else if (key == 77)
+            { // Right arrow
+                if (doesFit(currentPiece, rotation, x + 1, y))
+                    x++;
+            }
+            else if (key == 72)
+            { // Up arrow (rotate)
+                if (doesFit(currentPiece, rotation + 1, x, y))
+                    rotation++;
+            }
+            else if (key == 80)
+            { // Down arrow (soft drop)
+                if (doesFit(currentPiece, rotation, x, y + 1))
+                    y++;
+            }
+        }
+        else
+        {
+            // Handle other keys if needed
+        }
     }
 }
 
 void logic()
 {
     static int tick = 0;
+    int level = score / 1000;
+    int speed = max(10 - level, 1);
+
     tick++;
-    if (tick >= 10)
+    if (tick >= speed)
     {
         if (doesFit(currentPiece, rotation, x, y + 1))
             y++;
